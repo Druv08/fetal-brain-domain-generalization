@@ -330,6 +330,37 @@ class PreprocessingPipeline:
         self.crop_size = crop_size
         self.target_spacing = target_spacing
     
+    @classmethod
+    def from_config(cls, config: dict) -> 'PreprocessingPipeline':
+        """
+        Create PreprocessingPipeline from configuration dictionary.
+        
+        Args:
+            config: Configuration dictionary with 'preprocessing' key
+            
+        Returns:
+            Configured PreprocessingPipeline instance
+            
+        Example:
+            >>> config = {'preprocessing': {'crop_size': [128, 128, 128]}}
+            >>> pipeline = PreprocessingPipeline.from_config(config)
+        """
+        preprocess_config = config.get('preprocessing', {})
+        
+        clip_low = preprocess_config.get('clip_percentile_low', 0.5)
+        clip_high = preprocess_config.get('clip_percentile_high', 99.5)
+        
+        crop_size = preprocess_config.get('crop_size')
+        if crop_size is not None:
+            crop_size = tuple(crop_size)
+        
+        return cls(
+            clip_percentiles=(clip_low, clip_high),
+            normalize=preprocess_config.get('normalize', True),
+            crop_size=crop_size,
+            target_spacing=preprocess_config.get('target_spacing')
+        )
+    
     def __call__(
         self,
         volume: np.ndarray,
@@ -343,6 +374,40 @@ class PreprocessingPipeline:
             normalize=self.normalize,
             crop_size=self.crop_size
         )
+
+
+class Compose:
+    """
+    Compose multiple transforms together.
+    
+    Args:
+        transforms: List of callables that take (image, label) and return (image, label)
+        
+    Example:
+        >>> transform = Compose([
+        ...     PreprocessingPipeline(crop_size=(128, 128, 128)),
+        ... ])
+        >>> image, label = transform(image, label)
+    """
+    
+    def __init__(self, transforms: list):
+        self.transforms = transforms
+    
+    def __call__(
+        self,
+        volume: np.ndarray,
+        label: Optional[np.ndarray] = None
+    ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+        """Apply all transforms in sequence."""
+        for t in self.transforms:
+            if label is not None:
+                volume, label = t(volume, label)
+            else:
+                volume = t(volume)
+        
+        if label is not None:
+            return volume, label
+        return volume
 
 
 if __name__ == "__main__":

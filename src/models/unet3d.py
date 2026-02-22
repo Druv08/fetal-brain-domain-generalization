@@ -332,6 +332,10 @@ def build_unet3d(config: dict) -> UNet3D:
     """
     Build a 3D U-Net from configuration dictionary.
     
+    Supports two config formats:
+    1. Legacy: base_features + num_levels (auto-generates feature sizes)
+    2. New: features list (explicit feature sizes per level)
+    
     Args:
         config: Configuration dictionary with 'model' key
         
@@ -342,9 +346,8 @@ def build_unet3d(config: dict) -> UNet3D:
         >>> config = {
         ...     'model': {
         ...         'in_channels': 1,
-        ...         'num_classes': 8,
-        ...         'base_features': 32,
-        ...         'num_levels': 4,
+        ...         'out_channels': 7,
+        ...         'features': [32, 64, 128, 256],
         ...         'dropout': 0.1
         ...     }
         ... }
@@ -352,12 +355,27 @@ def build_unet3d(config: dict) -> UNet3D:
     """
     model_config = config.get('model', {})
     
+    # Get in/out channels
+    in_channels = model_config.get('in_channels', 1)
+    out_channels = model_config.get('out_channels', model_config.get('num_classes', 8))
+    dropout = model_config.get('dropout', 0.1)
+    
+    # Check for explicit features list (new format)
+    if 'features' in model_config:
+        features = model_config['features']
+        num_levels = len(features)
+        base_features = features[0] if features else 32
+    else:
+        # Legacy format
+        base_features = model_config.get('base_features', 32)
+        num_levels = model_config.get('num_levels', 4)
+    
     return UNet3D(
-        in_channels=model_config.get('in_channels', 1),
-        out_channels=model_config.get('num_classes', 8),
-        base_features=model_config.get('base_features', 32),
-        num_levels=model_config.get('num_levels', 4),
-        dropout=model_config.get('dropout', 0.1)
+        in_channels=in_channels,
+        out_channels=out_channels,
+        base_features=base_features,
+        num_levels=num_levels,
+        dropout=dropout
     )
 
 

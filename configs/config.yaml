@@ -3,50 +3,47 @@
 
 # Data Configuration
 data:
-  # Root directory containing the FeTA dataset
-  data_dir: "data/feta_2.4"
+  # Directory containing MRI images
+  images_dir: "data/feta_2.4/images"
   
-  # Training data directory
+  # Directory containing segmentation labels
+  labels_dir: "data/feta_2.4/labels"
+  
+  # Training data directory (alternative flat structure)
   train_dir: "data/feta_2.4/train"
   
-  # Validation data directory  
+  # Validation data directory
   val_dir: "data/feta_2.4/val"
   
   # Test data directory
   test_dir: "data/feta_2.4/test"
   
-  # Image file pattern (relative to subject folder)
+  # Number of segmentation classes (7 tissues)
+  num_classes: 7
+  
+  # Image file pattern
   image_pattern: "*_T2w.nii.gz"
   
-  # Label file pattern (relative to subject folder)
+  # Label file pattern
   label_pattern: "*_dseg.nii.gz"
 
 # Model Configuration
 model:
-  # Model architecture
-  architecture: "UNet3D"
-  
   # Number of input channels (1 for grayscale MRI)
   in_channels: 1
   
-  # Number of output classes (8 for FeTA: background + 7 tissues)
-  num_classes: 8
+  # Number of output classes (same as data.num_classes)
+  out_channels: 7
   
-  # Base number of feature channels
-  base_features: 32
-  
-  # Number of encoder/decoder levels
-  num_levels: 4
+  # Feature sizes for each encoder level
+  features: [32, 64, 128, 256]
   
   # Dropout probability
   dropout: 0.1
 
 # Preprocessing Configuration
 preprocessing:
-  # Target spacing for resampling (in mm)
-  target_spacing: [1.0, 1.0, 1.0]
-  
-  # Crop size for training patches
+  # Crop size for training patches [D, H, W]
   crop_size: [128, 128, 128]
   
   # Intensity clipping percentiles
@@ -70,29 +67,19 @@ training:
   # Weight decay for regularization
   weight_decay: 0.00001
   
-  # Learning rate scheduler
-  scheduler: "cosine"
-  
-  # Warmup epochs
-  warmup_epochs: 5
-  
   # Loss function
   loss: "dice_ce"
-  
+
+# System Configuration  
+system:
   # Number of data loading workers
-  num_workers: 4
+  num_workers: 0
   
-  # Mixed precision training
-  use_amp: true
+  # Device for training (cuda or cpu)
+  device: "cpu"
   
-  # Gradient accumulation steps
-  gradient_accumulation: 1
-  
-  # Checkpoint saving frequency (epochs)
-  save_freq: 10
-  
-  # Early stopping patience
-  early_stopping_patience: 20
+  # Random seed for reproducibility
+  seed: 42
 
 # Augmentation Configuration
 augmentation:

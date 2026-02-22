@@ -78,6 +78,27 @@ def get_device(device: Optional[str] = None) -> torch.device:
         return torch.device("cpu")
 
 
+def get_device_from_config(config: Dict) -> torch.device:
+    """
+    Get device from config dictionary.
+    
+    Looks for device in config['system']['device'] or falls back to auto-detection.
+    
+    Args:
+        config: Configuration dictionary
+        
+    Returns:
+        torch.device object
+        
+    Example:
+        >>> config = {'system': {'device': 'cuda'}}
+        >>> device = get_device_from_config(config)
+    """
+    system_config = config.get('system', {})
+    device_str = system_config.get('device', None)
+    return get_device(device_str)
+
+
 def save_checkpoint(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,

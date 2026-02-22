@@ -4,6 +4,9 @@ from .transforms import (
     intensity_clipping,
     center_crop_3d,
     resample_volume,
+    preprocess_volume,
+    PreprocessingPipeline,
+    Compose,
 )
 
 __all__ = [
@@ -11,4 +14,7 @@ __all__ = [
     "intensity_clipping",
     "center_crop_3d",
     "resample_volume",
+    "preprocess_volume",
+    "PreprocessingPipeline",
+    "Compose",
 ]
