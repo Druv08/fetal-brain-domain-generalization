@@ -1,0 +1,163 @@
+# Configuration for Fetal Brain MRI Segmentation
+# ================================================
+
+# Data Configuration
+data:
+  # Root directory containing the FeTA dataset
+  data_dir: "data/feta_2.4"
+  
+  # Training data directory
+  train_dir: "data/feta_2.4/train"
+  
+  # Validation data directory  
+  val_dir: "data/feta_2.4/val"
+  
+  # Test data directory
+  test_dir: "data/feta_2.4/test"
+  
+  # Image file pattern (relative to subject folder)
+  image_pattern: "*_T2w.nii.gz"
+  
+  # Label file pattern (relative to subject folder)
+  label_pattern: "*_dseg.nii.gz"
+
+# Model Configuration
+model:
+  # Model architecture
+  architecture: "UNet3D"
+  
+  # Number of input channels (1 for grayscale MRI)
+  in_channels: 1
+  
+  # Number of output classes (8 for FeTA: background + 7 tissues)
+  num_classes: 8
+  
+  # Base number of feature channels
+  base_features: 32
+  
+  # Number of encoder/decoder levels
+  num_levels: 4
+  
+  # Dropout probability
+  dropout: 0.1
+
+# Preprocessing Configuration
+preprocessing:
+  # Target spacing for resampling (in mm)
+  target_spacing: [1.0, 1.0, 1.0]
+  
+  # Crop size for training patches
+  crop_size: [128, 128, 128]
+  
+  # Intensity clipping percentiles
+  clip_percentile_low: 0.5
+  clip_percentile_high: 99.5
+  
+  # Whether to apply z-score normalization
+  normalize: true
+
+# Training Configuration
+training:
+  # Batch size
+  batch_size: 2
+  
+  # Number of epochs
+  num_epochs: 100
+  
+  # Learning rate
+  learning_rate: 0.0001
+  
+  # Weight decay for regularization
+  weight_decay: 0.00001
+  
+  # Learning rate scheduler
+  scheduler: "cosine"
+  
+  # Warmup epochs
+  warmup_epochs: 5
+  
+  # Loss function
+  loss: "dice_ce"
+  
+  # Number of data loading workers
+  num_workers: 4
+  
+  # Mixed precision training
+  use_amp: true
+  
+  # Gradient accumulation steps
+  gradient_accumulation: 1
+  
+  # Checkpoint saving frequency (epochs)
+  save_freq: 10
+  
+  # Early stopping patience
+  early_stopping_patience: 20
+
+# Augmentation Configuration
+augmentation:
+  # Probability of applying augmentation
+  prob: 0.5
+  
+  # Random rotation range (degrees)
+  rotation_range: 15
+  
+  # Random scaling range
+  scale_range: [0.9, 1.1]
+  
+  # Random flip axes
+  flip_axes: [0, 1, 2]
+  
+  # Intensity augmentation
+  intensity_shift: 0.1
+  intensity_scale: 0.1
+  
+  # Gaussian noise std
+  gaussian_noise_std: 0.05
+
+# Evaluation Configuration
+evaluation:
+  # Metrics to compute
+  metrics: ["dice", "hausdorff", "surface_dice"]
+  
+  # Whether to compute per-class metrics
+  per_class_metrics: true
+  
+  # Sliding window inference overlap
+  inference_overlap: 0.5
+
+# Output Configuration
+output:
+  # Directory for saving checkpoints
+  checkpoint_dir: "outputs/checkpoints"
+  
+  # Directory for saving logs
+  log_dir: "outputs/logs"
+  
+  # Directory for saving predictions
+  prediction_dir: "outputs/predictions"
+  
+  # Experiment name
+  experiment_name: "feta_baseline"
+
+# Hardware Configuration
+hardware:
+  # Device to use (cuda, cpu)
+  device: "cuda"
+  
+  # GPU indices to use (for multi-GPU training)
+  gpu_ids: [0]
+  
+  # Random seed for reproducibility
+  seed: 42
+
+# Logging Configuration
+logging:
+  # Logging level
+  level: "INFO"
+  
+  # TensorBoard logging
+  tensorboard: true
+  
+  # Logging frequency (iterations)
+  log_freq: 10
