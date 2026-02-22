@@ -2,8 +2,8 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-orange.svg)](https://pytorch.org/)
-[![MONAI](https://img.shields.io/badge/MONAI-1.3+-green.svg)](https://monai.io/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Pipeline](https://img.shields.io/badge/Pipeline-Verified-success.svg)](#sanity-check)
 
 ## Research Problem
 
@@ -15,7 +15,7 @@ This project addresses the challenge of building **domain-generalizable** segmen
 
 Develop a deep learning pipeline for multi-tissue fetal brain MRI segmentation that:
 
-1. **Accurately segments** multiple brain tissue classes (white matter, gray matter, CSF, etc.)
+1. **Accurately segments** 7 brain tissue classes
 2. **Generalizes across domains** (different scanners, sites, gestational ages)
 3. **Provides reproducible** and clinically useful results
 4. **Enables research** into domain adaptation and generalization techniques
@@ -27,7 +27,7 @@ Develop a deep learning pipeline for multi-tissue fetal brain MRI segmentation t
 The [Fetal Tissue Annotation (FeTA)](https://feta.grand-challenge.org/) dataset provides:
 
 - **3D T2-weighted MRI scans** of the fetal brain
-- **Multi-class segmentation labels** with 7+ tissue classes
+- **Multi-class segmentation labels** with 7 tissue classes
 - **Multi-site data** from different hospitals and scanners
 - **Range of gestational ages** (typically 20-35 weeks)
 
@@ -41,160 +41,272 @@ The [Fetal Tissue Annotation (FeTA)](https://feta.grand-challenge.org/) dataset 
 | 4 | Ventricles |
 | 5 | Cerebellum |
 | 6 | Deep Gray Matter |
-| 7 | Brainstem |
-
-## Methodology
-
-### Pipeline Overview
-
-```
-Data Loading → Preprocessing → Augmentation → 3D U-Net → Training → Evaluation
-```
-
-### Key Components
-
-1. **Data Pipeline**: NIfTI loading, normalization, and PyTorch Dataset integration
-2. **Preprocessing**: Z-score normalization, intensity clipping, resampling
-3. **Model**: 3D U-Net architecture with configurable depth and channels
-4. **Training**: Dice loss optimization, learning rate scheduling
-5. **Evaluation**: Multi-class Dice score, per-tissue analysis
-
-### Domain Generalization Strategies (Planned)
-
-- Data augmentation for robustness
-- Domain-invariant feature learning
-- Test-time adaptation techniques
 
 ## Project Structure
 
 ```
-FeTa/
+fetal-brain-domain-generalization/
 ├── src/
-│   ├── data/              # Data loading and dataset classes
-│   ├── preprocessing/     # Image preprocessing transforms
-│   ├── models/            # Neural network architectures
-│   ├── training/          # Training loops and utilities
-│   ├── evaluation/        # Metrics and evaluation functions
-│   └── utils/             # Helper functions
-├── notebooks/             # Jupyter notebooks for EDA
-├── outputs/               # Model checkpoints and results
-├── configs/               # Configuration files
-├── requirements.txt       # Python dependencies
-└── README.md              # This file
+│   ├── data/
+│   │   ├── __init__.py
+│   │   └── dataloader.py       # NIfTI loading, Dataset class
+│   ├── preprocessing/
+│   │   ├── __init__.py
+│   │   └── transforms.py       # Z-score, clipping, cropping
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── unet3d.py          # 3D U-Net (26M params)
+│   ├── training/
+│   │   ├── __init__.py
+│   │   └── trainer.py         # Training loop, Dice+CE loss
+│   ├── evaluation/
+│   │   ├── __init__.py
+│   │   └── metrics.py         # Multi-class Dice score
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   └── helpers.py         # Seed, device utilities
+│   └── sanity_check.py        # Pipeline verification script
+├── notebooks/
+│   └── 01_eda.ipynb           # Exploratory data analysis
+├── configs/
+│   └── config.yaml            # All hyperparameters
+├── outputs/                    # Checkpoints (gitignored)
+├── main.py                     # Training entry point
+├── requirements.txt
+└── README.md
 ```
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.9+
-- CUDA 11.8+ (for GPU acceleration)
-- 16GB+ RAM recommended
-
-### Setup
-
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/FeTa.git
-cd FeTa
+git clone https://github.com/Druv08/fetal-brain-domain-generalization.git
+cd fetal-brain-domain-generalization
 
 # Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # Linux/Mac
 
 # Install dependencies
-pip install -r requirements.txt
+pip install torch nibabel pyyaml numpy tqdm
+```
+
+## Configuration
+
+Edit `configs/config.yaml`:
+
+```yaml
+data:
+  images_dir: "data/feta_2.4/images"
+  labels_dir: "data/feta_2.4/labels"
+  num_classes: 7
+
+model:
+  in_channels: 1
+  out_channels: 7
+  features: [32, 64, 128, 256]
+
+training:
+  batch_size: 2
+  num_epochs: 100
+  learning_rate: 0.0001
+
+system:
+  num_workers: 0
+  device: "cpu"  # or "cuda"
+  seed: 42
+```
+
+## Sanity Check
+
+Verify the entire pipeline works end-to-end:
+
+```bash
+python src/sanity_check.py --config configs/config.yaml --train
+```
+
+**Expected Output:**
+```
+============================================================
+FETAL BRAIN MRI SEGMENTATION - SANITY CHECK
+============================================================
+
+[1/6] Loading configuration...
+  ✓ Config loaded from: configs/config.yaml
+
+[2/6] Creating preprocessing transforms...
+  ✓ PreprocessingPipeline created
+
+[3/6] Creating dataset...
+  ✓ Dataset created with 1 samples
+
+[4/6] Creating dataloader...
+  ✓ DataLoader created
+
+[5/6] Building model...
+  ✓ 3D U-Net model built
+  ✓ Total parameters: 26,321,671
+
+[6/6] Running forward pass...
+  → Image tensor shape: [1, 1, 128, 128, 128]
+  → Label tensor shape: [1, 128, 128, 128]
+  → Model output shape: [1, 7, 128, 128, 128]
+  ✓ All shape checks passed!
+
+============================================================
+SANITY CHECK PASSED ✓
+============================================================
+
+============================================================
+ONE-STEP TRAINING TEST
+============================================================
+
+  ✓ Loss value: 2.0496
+  ✓ Gradients computed and weights updated!
+
+============================================================
+ONE-STEP TRAINING PASSED ✓
+============================================================
 ```
 
 ## Usage
 
-### 1. Configure Paths
-
-Edit `configs/config.yaml` with your dataset paths:
-
-```yaml
-data:
-  data_dir: "/path/to/feta_dataset"
-  train_dir: "/path/to/feta_dataset/train"
-  val_dir: "/path/to/feta_dataset/val"
-```
-
-### 2. Exploratory Data Analysis
+### 1. Exploratory Data Analysis
 
 ```bash
-# Run the EDA notebook
 jupyter notebook notebooks/01_eda.ipynb
 ```
 
-### 3. Train the Model
+### 2. Training
+
+```bash
+python main.py --config configs/config.yaml
+```
+
+### 3. Programmatic Usage
 
 ```python
-from src.data import FetalBrainDataset
-from src.models import UNet3D
+from src.data import load_config, FetalBrainDatasetFromConfig
+from src.preprocessing import PreprocessingPipeline
+from src.models.unet3d import build_unet3d
 from src.training import Trainer
 
-# Load configuration
-import yaml
-with open("configs/config.yaml", "r") as f:
-    config = yaml.safe_load(f)
+# Load config
+config = load_config("configs/config.yaml")
 
-# Initialize components
-dataset = FetalBrainDataset(config["data"]["train_dir"])
-model = UNet3D(in_channels=1, out_channels=config["model"]["num_classes"])
-trainer = Trainer(model, config)
+# Setup pipeline
+transform = PreprocessingPipeline(crop_size=(128, 128, 128))
+dataset = FetalBrainDatasetFromConfig(config, transform=transform)
+model = build_unet3d(config)
 
 # Train
-trainer.train(dataset)
+trainer = Trainer(model, config)
+trainer.train(train_loader, val_loader)
 ```
 
-### 4. Evaluate
+## Pipeline Architecture
 
-```python
-from src.evaluation import dice_score_multiclass
-
-# Load model and predict
-predictions = model(test_images)
-dice_scores = dice_score_multiclass(predictions, labels, num_classes=8)
-print(f"Mean Dice: {dice_scores.mean():.4f}")
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CONFIG (config.yaml)                      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   DATA LOADING (NIfTI)                       │
+│  • Load 3D volumes with nibabel                              │
+│  • Discover image/label pairs                                │
+│  • Return [1, D, H, W] tensors                               │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    PREPROCESSING                             │
+│  • Intensity clipping (0.5-99.5 percentile)                  │
+│  • Z-score normalization                                     │
+│  • Center crop to [128, 128, 128]                            │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    3D U-NET MODEL                            │
+│  • Input:  [B, 1, 128, 128, 128]                             │
+│  • Output: [B, 7, 128, 128, 128]                             │
+│  • Parameters: 26,321,671                                    │
+│  • Features: [32, 64, 128, 256]                              │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    TRAINING                                  │
+│  • Loss: Dice + CrossEntropy                                 │
+│  • Optimizer: Adam (lr=0.0001)                               │
+│  • Validation: Multi-class Dice score                        │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    EVALUATION                                │
+│  • Per-class Dice scores                                     │
+│  • Mean Dice across tissues                                  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Running Order
+## Model Architecture
 
-1. **Setup**: Install requirements and configure paths
-2. **EDA**: Run `notebooks/01_eda.ipynb` to understand the data
-3. **Preprocessing**: Verify preprocessing functions work correctly
-4. **Training**: Train the 3D U-Net model
-5. **Evaluation**: Evaluate on validation/test sets
+**3D U-Net** with encoder-decoder structure:
+
+| Component | Details |
+|-----------|---------|
+| Input | `[B, 1, D, H, W]` - Single channel MRI |
+| Encoder | 4 levels: 32→64→128→256 features |
+| Bottleneck | 512 features |
+| Decoder | 4 levels with skip connections |
+| Output | `[B, 7, D, H, W]` - 7 class logits |
+| Parameters | 26,321,671 |
 
 ## Results
 
-*Results will be added as experiments progress.*
-
-| Metric | Score |
+| Metric | Value |
 |--------|-------|
-| Mean Dice | TBD |
-| WM Dice | TBD |
-| GM Dice | TBD |
+| Image Shape | `[1, 1, 128, 128, 128]` |
+| Label Shape | `[1, 128, 128, 128]` |
+| Output Shape | `[1, 7, 128, 128, 128]` |
+| Initial Loss | ~2.0 |
+| Parameters | 26.3M |
+
+## Roadmap
+
+- [x] Project structure setup
+- [x] Config-driven pipeline
+- [x] Data loading module
+- [x] Preprocessing transforms
+- [x] 3D U-Net model
+- [x] Training loop skeleton
+- [x] Evaluation metrics
+- [x] Sanity check script
+- [x] One-step training verification
+- [ ] Full training on FeTA dataset
+- [ ] Domain generalization techniques
+- [ ] Evaluation on held-out domains
 
 ## Citation
 
-If you use this code, please cite:
-
 ```bibtex
-@misc{feta_segmentation,
+@misc{fetal_brain_dg,
   title={Domain-Generalizable Multi-Tissue Fetal Brain MRI Segmentation},
-  author={Your Name},
+  author={Druv},
   year={2026},
-  url={https://github.com/yourusername/FeTa}
+  url={https://github.com/Druv08/fetal-brain-domain-generalization}
 }
 ```
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
 - [FeTA Challenge](https://feta.grand-challenge.org/) for the dataset
-- [MONAI](https://monai.io/) for medical imaging tools
 - [PyTorch](https://pytorch.org/) for the deep learning framework
