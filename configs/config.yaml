@@ -6,8 +6,8 @@ data:
   # Root data directory containing sub-*/anat/ folders
   data_dir: "data"
   
-  # Number of segmentation classes
-  num_classes: 7
+  # Number of segmentation classes (0-7 in FeTA 2.4)
+  num_classes: 8
   
   # Image file pattern (inside sub-*/anat/)
   image_pattern: "*_T2w.nii.gz"
@@ -21,7 +21,7 @@ model:
   in_channels: 1
   
   # Number of output classes (same as data.num_classes)
-  out_channels: 7
+  out_channels: 8
   
   # Feature sizes for each encoder level
   features: [32, 64, 128, 256]
