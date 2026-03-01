@@ -172,10 +172,21 @@ class Trainer:
         device: Optional[torch.device] = None
     ):
         self.config = config
-        self.device = device or get_device(config.get('hardware', {}).get('device'))
+        self.device = device or get_device(config.get('system', {}).get('device'))
         
         # Move model to device
         self.model = model.to(self.device)
+        
+        # Training config (must come before scheduler creation)
+        train_config = config.get('training', {})
+        self.num_epochs = train_config.get('num_epochs', 100)
+        self.gradient_accumulation = train_config.get('gradient_accumulation', 1)
+        self.save_freq = train_config.get('save_freq', 10)
+        self.early_stopping_patience = train_config.get('early_stopping_patience', 20)
+        
+        # Only use AMP on CUDA
+        self.use_amp = train_config.get('use_amp', False) and self.device.type == 'cuda'
+        self.scaler = torch.amp.GradScaler('cuda') if self.use_amp else None
         
         # Setup optimizer
         if optimizer is not None:
@@ -199,17 +210,6 @@ class Trainer:
         self.current_epoch = 0
         self.best_metric = 0.0
         self.best_loss = float('inf')
-        
-        # Training config
-        train_config = config.get('training', {})
-        self.num_epochs = train_config.get('num_epochs', 100)
-        self.use_amp = train_config.get('use_amp', True)
-        self.gradient_accumulation = train_config.get('gradient_accumulation', 1)
-        self.save_freq = train_config.get('save_freq', 10)
-        self.early_stopping_patience = train_config.get('early_stopping_patience', 20)
-        
-        # Setup mixed precision
-        self.scaler = torch.amp.GradScaler('cuda') if self.use_amp else None
         
         # Output directories
         output_config = config.get('output', {})
@@ -355,7 +355,7 @@ class Trainer:
         smooth: float = 1e-5
     ) -> float:
         """Compute mean Dice score."""
-        num_classes = self.config.get('model', {}).get('num_classes', 8)
+        num_classes = self.config.get('model', {}).get('out_channels', 8)
         
         dice_scores = []
         
@@ -455,7 +455,7 @@ class Trainer:
             
             # Print epoch summary
             epoch_time = time.time() - epoch_start
-            print(f"\nEpoch {epoch}/{self.num_epochs} ({format_time(epoch_time)})")
+            print(f"\nEpoch {epoch + 1}/{self.num_epochs} ({format_time(epoch_time)})")
             print(f"  Train Loss: {train_metrics['train_loss']:.4f}")
             if val_loader is not None:
                 print(f"  Val Loss: {val_metrics['val_loss']:.4f}")
