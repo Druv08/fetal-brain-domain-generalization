@@ -17,6 +17,73 @@ import torch
 import torch.nn.functional as F
 
 
+# FeTA tissue class names (0-7)
+FETA_CLASS_NAMES = [
+    "Background",
+    "External CSF",
+    "Gray Matter",
+    "White Matter",
+    "Ventricles",
+    "Cerebellum",
+    "Deep Gray Matter",
+    "Brainstem",
+]
+
+
+def compute_batch_dice(
+    prediction: torch.Tensor,
+    target: torch.Tensor,
+    num_classes: int = 8,
+    ignore_background: bool = True,
+    smooth: float = 1e-5,
+) -> Dict[str, float]:
+    """
+    Compute per-class and mean Dice score for a batch (GPU-friendly).
+
+    Args:
+        prediction: Raw logits **[B, C, D, H, W]**  (softmax applied internally)
+                     or class labels **[B, D, H, W]** (argmax already done).
+        target:      Ground truth labels **[B, D, H, W]** with integer class indices.
+        num_classes:  Number of classes (including background).
+        ignore_background: If True, exclude class 0 from the mean Dice.
+        smooth:       Smoothing constant.
+
+    Returns:
+        dict with keys:
+            ``'mean_dice'``  – mean Dice across foreground classes
+            ``'per_class'``  – list of length *num_classes* with per-class Dice
+    """
+    with torch.no_grad():
+        # If prediction has a channel dim, convert to class labels
+        if prediction.ndim == 5:                       # [B, C, D, H, W]
+            prediction = prediction.argmax(dim=1)      # → [B, D, H, W]
+
+        per_class: list[float] = []
+        fg_scores: list[float] = []
+
+        start = 1 if ignore_background else 0
+
+        for c in range(num_classes):
+            pred_c = (prediction == c).float()
+            tgt_c = (target == c).float()
+
+            intersection = (pred_c * tgt_c).sum()
+            union = pred_c.sum() + tgt_c.sum()
+
+            if union > 0:
+                dice = ((2.0 * intersection + smooth) / (union + smooth)).item()
+            else:
+                dice = 1.0 if tgt_c.sum() == 0 else 0.0
+
+            per_class.append(dice)
+            if c >= start:
+                fg_scores.append(dice)
+
+        mean_dice = float(np.mean(fg_scores)) if fg_scores else 0.0
+
+    return {"mean_dice": mean_dice, "per_class": per_class}
+
+
 def dice_score(
     prediction: Union[np.ndarray, torch.Tensor],
     target: Union[np.ndarray, torch.Tensor],

@@ -22,6 +22,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from ..utils.helpers import AverageMeter, format_time, save_checkpoint, get_device
+from ..evaluation.metrics import compute_batch_dice, FETA_CLASS_NAMES
 
 
 class DiceLoss(nn.Module):
@@ -315,12 +316,16 @@ class Trainer:
             val_loader: Validation data loader
             
         Returns:
-            Dictionary with validation metrics
+            Dictionary with validation metrics including per-class Dice.
         """
         self.model.eval()
+        num_classes = self.config.get('model', {}).get('out_channels', 8)
         
         loss_meter = AverageMeter('loss')
         dice_meter = AverageMeter('dice')
+        # Accumulate per-class Dice across batches
+        class_dice_accum = [0.0] * num_classes
+        n_batches = 0
         
         for images, labels in tqdm(val_loader, desc="Validation"):
             images = images.to(self.device)
@@ -335,17 +340,25 @@ class Trainer:
                 outputs = self.model(images)
                 loss = self.criterion(outputs, labels)
             
-            # Compute Dice score
-            predictions = torch.argmax(outputs, dim=1)
-            dice = self._compute_dice(predictions, labels)
+            # Compute per-class + mean Dice
+            dice_result = compute_batch_dice(
+                outputs, labels, num_classes=num_classes, ignore_background=True
+            )
             
-            # Update metrics
+            # Update meters
             loss_meter.update(loss.item(), images.size(0))
-            dice_meter.update(dice, images.size(0))
+            dice_meter.update(dice_result['mean_dice'], images.size(0))
+            for c in range(num_classes):
+                class_dice_accum[c] += dice_result['per_class'][c]
+            n_batches += 1
+        
+        # Average per-class Dice over batches
+        per_class_avg = [d / max(n_batches, 1) for d in class_dice_accum]
         
         return {
             'val_loss': loss_meter.avg,
-            'val_dice': dice_meter.avg
+            'val_dice': dice_meter.avg,
+            'per_class_dice': per_class_avg,
         }
     
     def _compute_dice(
@@ -456,10 +469,16 @@ class Trainer:
             # Print epoch summary
             epoch_time = time.time() - epoch_start
             print(f"\nEpoch {epoch + 1}/{self.num_epochs} ({format_time(epoch_time)})")
-            print(f"  Train Loss: {train_metrics['train_loss']:.4f}")
+            print(f"  Train Loss : {train_metrics['train_loss']:.4f}")
             if val_loader is not None:
-                print(f"  Val Loss: {val_metrics['val_loss']:.4f}")
-                print(f"  Val Dice: {val_metrics['val_dice']:.4f}")
+                print(f"  Val Loss   : {val_metrics['val_loss']:.4f}")
+                print(f"  Mean Dice  : {val_metrics['val_dice']:.4f}")
+                # Per-class Dice
+                per_class = val_metrics.get('per_class_dice', [])
+                num_classes = len(per_class)
+                for c in range(1, num_classes):  # skip background
+                    name = FETA_CLASS_NAMES[c] if c < len(FETA_CLASS_NAMES) else f'Class {c}'
+                    print(f"    {name:<18s}: {per_class[c]:.4f}")
             print(f"  LR: {current_lr:.6f}")
             print(f"  Best Dice: {self.best_metric:.4f}")
             
