@@ -3,28 +3,16 @@
 
 # Data Configuration
 data:
-  # Directory containing MRI images
-  images_dir: "data/feta_2.4/images"
+  # Root data directory containing sub-*/anat/ folders
+  data_dir: "data"
   
-  # Directory containing segmentation labels
-  labels_dir: "data/feta_2.4/labels"
-  
-  # Training data directory (alternative flat structure)
-  train_dir: "data/feta_2.4/train"
-  
-  # Validation data directory
-  val_dir: "data/feta_2.4/val"
-  
-  # Test data directory
-  test_dir: "data/feta_2.4/test"
-  
-  # Number of segmentation classes (7 tissues)
+  # Number of segmentation classes
   num_classes: 7
   
-  # Image file pattern
+  # Image file pattern (inside sub-*/anat/)
   image_pattern: "*_T2w.nii.gz"
   
-  # Label file pattern
+  # Label file pattern (inside sub-*/anat/)
   label_pattern: "*_dseg.nii.gz"
 
 # Model Configuration
