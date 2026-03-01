@@ -266,7 +266,8 @@ class Trainer:
         
         loss_meter = AverageMeter('loss')
         
-        pbar = tqdm(train_loader, desc=f"Epoch {self.current_epoch}")
+        total_batches = len(train_loader)
+        pbar = tqdm(train_loader, desc=f"  Training", leave=False)
         
         for batch_idx, (images, labels) in enumerate(pbar):
             images = images.to(self.device)
@@ -300,7 +301,9 @@ class Trainer:
             loss_meter.update(loss.item(), images.size(0))
             
             # Update progress bar
-            pbar.set_postfix({'loss': f'{loss_meter.avg:.4f}'})
+            pbar.set_postfix_str(
+                f"Batch [{batch_idx+1}/{total_batches}] - Loss: {loss.item():.4f}"
+            )
         
         return {'train_loss': loss_meter.avg}
     
@@ -327,7 +330,7 @@ class Trainer:
         class_dice_accum = [0.0] * num_classes
         n_batches = 0
         
-        for images, labels in tqdm(val_loader, desc="Validation"):
+        for images, labels in tqdm(val_loader, desc="  Validating", leave=False):
             images = images.to(self.device)
             labels = labels.to(self.device)
             
@@ -400,9 +403,18 @@ class Trainer:
         Returns:
             Dictionary with training history
         """
-        print(f"Starting training for {self.num_epochs} epochs")
-        print(f"Device: {self.device}")
-        print(f"Model parameters: {sum(p.numel() for p in self.model.parameters()):,}")
+        total_params = sum(p.numel() for p in self.model.parameters())
+        n_train = len(train_loader.dataset)
+        n_val = len(val_loader.dataset) if val_loader is not None else 0
+
+        print()
+        print("=" * 48)
+        print("  3D U-Net Training Started")
+        print(f"  Device              : {self.device}")
+        print(f"  Total parameters    : {total_params:,}")
+        print(f"  Training subjects   : {n_train}")
+        print(f"  Validation subjects : {n_val}")
+        print("=" * 48)
         
         history = {
             'train_loss': [],
@@ -440,24 +452,24 @@ class Trainer:
             if self.scheduler is not None:
                 self.scheduler.step()
             
-            # Check for improvement
-            if current_metric > self.best_metric:
+            # ── Check for improvement & save ──────────────
+            is_best = current_metric > self.best_metric
+            if is_best:
                 self.best_metric = current_metric
+                self.best_loss = val_metrics['val_loss'] if val_loader is not None else train_metrics['train_loss']
                 no_improvement_count = 0
-                
-                # Save best model
+                best_path = self.checkpoint_dir / f'{self.experiment_name}_best.pth'
                 save_checkpoint(
                     self.model, self.optimizer, epoch,
                     train_metrics['train_loss'],
-                    self.checkpoint_dir / f'{self.experiment_name}_best.pth',
+                    best_path,
                     scheduler=self.scheduler,
                     metrics={'dice': current_metric},
                     config=self.config
                 )
             else:
                 no_improvement_count += 1
-            
-            # Regular checkpoint
+
             if epoch % self.save_freq == 0:
                 save_checkpoint(
                     self.model, self.optimizer, epoch,
@@ -465,22 +477,25 @@ class Trainer:
                     self.checkpoint_dir / f'{self.experiment_name}_epoch{epoch}.pth',
                     scheduler=self.scheduler
                 )
-            
-            # Print epoch summary
-            epoch_time = time.time() - epoch_start
-            print(f"\nEpoch {epoch + 1}/{self.num_epochs} ({format_time(epoch_time)})")
+
+            # ── Epoch summary ──────────────────────────────
+            print(f"\nEpoch [{epoch + 1}/{self.num_epochs}]")
             print(f"  Train Loss : {train_metrics['train_loss']:.4f}")
             if val_loader is not None:
                 print(f"  Val Loss   : {val_metrics['val_loss']:.4f}")
                 print(f"  Mean Dice  : {val_metrics['val_dice']:.4f}")
-                # Per-class Dice
+                # Per-class Dice table
                 per_class = val_metrics.get('per_class_dice', [])
                 num_classes = len(per_class)
+                print("\n  Dice per tissue:")
                 for c in range(1, num_classes):  # skip background
                     name = FETA_CLASS_NAMES[c] if c < len(FETA_CLASS_NAMES) else f'Class {c}'
                     print(f"    {name:<18s}: {per_class[c]:.4f}")
-            print(f"  LR: {current_lr:.6f}")
-            print(f"  Best Dice: {self.best_metric:.4f}")
+            print()
+            if is_best:
+                print(f"  \u2705 New best model saved at: {best_path}")
+            print(f"  LR         : {current_lr:.6f}")
+            print("-" * 48)
             
             # Early stopping
             if no_improvement_count >= self.early_stopping_patience:
@@ -488,9 +503,15 @@ class Trainer:
                 break
         
         total_time = time.time() - start_time
-        print(f"\nTraining completed in {format_time(total_time)}")
-        print(f"Best validation Dice: {self.best_metric:.4f}")
-        
+        print()
+        print("=" * 48)
+        print("  Training Complete")
+        print(f"  Duration               : {format_time(total_time)}")
+        print(f"  Best Validation Loss   : {self.best_loss:.4f}")
+        print(f"  Best Mean Dice         : {self.best_metric:.4f}")
+        print("=" * 48)
+        print()
+
         return history
 
 

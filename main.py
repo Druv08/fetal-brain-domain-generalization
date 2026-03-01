@@ -102,34 +102,8 @@ def main(args):
     print(f"  Output classes: {out_ch}")
 
     # ── 5. Train ───────────────────────────────────────────────
-    print("\n[5/5] Starting training...\n")
     trainer = Trainer(model, config, device=device)
     history = trainer.train(train_loader, val_loader)
-
-    # ── Final evaluation on val set ────────────────────────────
-    print("\n" + "=" * 60)
-    print(" Final Evaluation")
-    print("=" * 60)
-
-    evaluator = SegmentationEvaluator(num_classes=out_ch)
-    model.eval()
-    with torch.no_grad():
-        for images, labels in val_loader:
-            images = images.to(device)
-            outputs = model(images)
-            predictions = torch.argmax(outputs, dim=1)
-            evaluator.update(predictions.cpu(), labels)
-    evaluator.print_report()
-
-    # ── Summary ────────────────────────────────────────────────
-    print("\n" + "=" * 60)
-    print(" TRAINING COMPLETE")
-    print("=" * 60)
-    print(f"  Final train loss : {history['train_loss'][-1]:.4f}")
-    if history["val_dice"]:
-        print(f"  Best val Dice    : {max(history['val_dice']):.4f}")
-    print(f"  Checkpoints in   : outputs/checkpoints/")
-    print()
 
 
 if __name__ == "__main__":
